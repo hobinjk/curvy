@@ -7,7 +7,7 @@ var gfx = canvas.getContext("2d");
 var bestWord = "";
 var curve = [];
 var mousePressed = false;
-var wordCurveResolution = 5;
+var wordCurveResolution = 20;
 var lastCoords = {x: 0, y: 0};
 
 var keyboardScale = 50;
@@ -30,7 +30,7 @@ document.addEventListener("mousemove", function(event) {
 
   var diff = (event.clientX - lastCoords.x)*(event.clientX - lastCoords.x)
   + (event.clientY - lastCoords.y)*(event.clientY - lastCoords.y)
-  if(diff > 10*10) {
+  if(diff > wordCurveResolution*wordCurveResolution) {
     lastCoords = {x: event.clientX, y: event.clientY};
     curve.push(lastCoords);
   }
@@ -150,7 +150,7 @@ function getCurveSimilarity(baseCurve, testCurve) {
       //console.log(testTheta - baseTheta);
       totalScore += Math.abs(thetaDiff)*Math.sqrt(closestScore);
     }
-    totalScore /= testDiffs.length;
+    // totalScore /= testDiffs.length;
     return totalScore;
   }
 
