@@ -4,13 +4,16 @@ canvas.height = window.innerHeight;
 
 var gfx = canvas.getContext("2d");
 
-var bestWord = "";
 var curve = [];
 var mousePressed = false;
-var wordCurveResolution = 20;
+var wordCurveResolution = 10;
 var lastCoords = {x: 0, y: 0};
 
 var keyboardScale = 50;
+var suggestionCount = 5;
+var bestWords = new Array(suggestionCount);
+for(var i = 0; i < bestWords.length; i++)
+  bestWords[i] = "";
 
 document.addEventListener("mousedown", function(event) {
   curve = [];
@@ -21,7 +24,7 @@ document.addEventListener("mouseup", function(event) {
   mousePressed = false;
 
 
-  bestWord = findBestWord(curve, wordList);
+  bestWords = findBestSuggestions(curve, wordList).map(function(suggestion) { return suggestion.word; });
   draw();
 });
 
@@ -60,10 +63,17 @@ function getWordCurve(word) {
 }
 
 function drawKeyboard() {
-  gfx.fillStyle = "white";
+  gfx.textAlign = "center";
+  gfx.textBaseline = "middle";
+
   for(var keyIdx = 'a'.charCodeAt(0); keyIdx <= 'z'.charCodeAt(0); keyIdx++) {
     var key = String.fromCharCode(keyIdx);
     var coords = getKeyCoords(key);
+    gfx.strokeStyle = "white";
+    gfx.fillStyle = "#444";
+    gfx.fillRect(coords.x-keyboardScale/2, coords.y-keyboardScale/2, keyboardScale, keyboardScale);
+    gfx.strokeRect(coords.x-keyboardScale/2, coords.y-keyboardScale/2, keyboardScale, keyboardScale);
+    gfx.fillStyle = "white";
     gfx.fillText(key.toUpperCase(), coords.x, coords.y);
   }
 }
@@ -131,6 +141,10 @@ function getCurveSimilarity(baseCurve, testCurve) {
     var totalScore = 0;
     for(var i = 0; i < testDiffs.length; i++) {
       var testDiff = testDiffs[i];
+      var closestDiff = i < baseDiffs.length ? baseDiffs[i] : baseDiffs[baseDiffs.length-1];
+      var closestScore = (closestDiff.x - testDiff.x)*(closestDiff.x - testDiff.x)
+                       + (closestDiff.y - testDiff.y)*(closestDiff.y - testDiff.y);
+      /*
       var closestDiff = baseDiffs[0];
       var closestScore = 9001*9001;
       for(var j = 0; j < baseDiffs.length; j++) {
@@ -142,10 +156,14 @@ function getCurveSimilarity(baseCurve, testCurve) {
           closestDiff = baseDiff;
         }
       }
+      */
 
       var testTheta = Math.atan2(testDiff.dy, testDiff.dx);
       var baseTheta = Math.atan2(closestDiff.dy, closestDiff.dx);
-      var thetaDiff = (baseTheta - testTheta + 2*Math.PI) % (2*Math.PI);
+      var thetaDiff = baseTheta - testTheta;
+      if(thetaDiff < -Math.PI) thetaDiff += 2*Math.PI;
+      if(thetaDiff > Math.PI) thetaDiff -= 2*Math.PI;
+
 
       //console.log(testTheta - baseTheta);
       totalScore += Math.abs(thetaDiff)*Math.sqrt(closestScore);
@@ -158,9 +176,12 @@ function getCurveSimilarity(baseCurve, testCurve) {
   return totalScore;
 }
 
-function findBestWord(testCurve, words) {
-  var bestWord = "";
-  var bestScore = 9001*9001;
+function findBestSuggestions(testCurve, words) {
+  var bestSuggestions = new Array(suggestionCount);
+  for(var i = 0; i < suggestionCount; i++) {
+    bestSuggestions[i] = {word: "", score: 9001*9001};
+  }
+
 
   if(testCurve.length === 0)
     return "";
@@ -170,22 +191,36 @@ function findBestWord(testCurve, words) {
     var wordScore = getCurveSimilarity(wordCurve, testCurve);
     if(words[i] === "red" || words[i] === "fed")
       console.log(words[i]+": "+wordScore);
-    if(wordScore < bestScore) {
-      bestScore = wordScore;
-      bestWord = words[i];
+    if(wordScore > bestSuggestions[bestSuggestions.length-1]) {
+      continue;
+    }
+    for(var suggestion = 0; suggestion < suggestionCount; suggestion++) {
+      if(bestSuggestions[suggestion].score < wordScore)
+        continue;
+      for(var copy = suggestionCount-2; copy >= suggestion; copy--) {
+        bestSuggestions[copy+1].word = bestSuggestions[copy].word;
+        bestSuggestions[copy+1].score = bestSuggestions[copy].score;
+      }
+      bestSuggestions[suggestion].word = words[i];
+      bestSuggestions[suggestion].score = wordScore;
+      break;
     }
   }
 
-  console.log("best is: "+bestWord+" with score "+bestScore);
-  return bestWord;
+  console.log("best is: "+bestSuggestions[0].word+" with score "+bestSuggestions[0].score);
+  return bestSuggestions;
 }
 
 function draw() {
   gfx.fillStyle = "black";
   gfx.fillRect(0,0,canvas.width,canvas.height);
 
-  gfx.fillStyle = "blue";
-  gfx.fillText(bestWord, 20,20);
+  gfx.fillStyle = "white";
+  gfx.textAlign = "left";
+  gfx.textBaseline = "baseline";
+  for(var i = 0; i < suggestionCount; i++) {
+    gfx.fillText(bestWords[i], 20,20+i*20);
+  }
 
   drawKeyboard();
 
